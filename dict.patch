@@ -1,0 +1,53 @@
+diff --git a/src/NJsonSchema.CodeGeneration.TypeScript/DataConversionGenerator.cs b/src/NJsonSchema.CodeGeneration.TypeScript/DataConversionGenerator.cs
+index 9c52b24..c97c131 100644
+--- a/src/NJsonSchema.CodeGeneration.TypeScript/DataConversionGenerator.cs
++++ b/src/NJsonSchema.CodeGeneration.TypeScript/DataConversionGenerator.cs
+@@ -30,7 +30,12 @@ public static string RenderConvertToClassCode(DataConversionParameters parameter
+         private static object CreateModel(DataConversionParameters parameters)
+         {
+             var type = parameters.Resolver.Resolve(parameters.Schema, parameters.IsPropertyNullable, parameters.TypeNameHint);
++            var dictionaryValueType = parameters.Resolver.TryResolve(parameters.Schema.AdditionalPropertiesSchema, parameters.TypeNameHint) ?? "any";
+             var defaultValueGenerator = new TypeScriptDefaultValueGenerator(parameters.Resolver);
++            var dictionaryValueDefaultValue = parameters.Schema.AdditionalPropertiesSchema != null
++                ? defaultValueGenerator.GetDefaultValue(parameters.Schema.AdditionalPropertiesSchema,
++                    parameters.IsPropertyNullable, dictionaryValueType, parameters.TypeNameHint, parameters.Settings.GenerateDefaultValues)
++                : null;
+             return new
+             {
+                 NullValue = parameters.NullValue.ToString().ToLowerInvariant(),
+@@ -38,9 +43,9 @@ private static object CreateModel(DataConversionParameters parameters)
+                 Variable = parameters.Variable,
+                 Value = parameters.Value,
+ 
+-                HasDefaultValue = defaultValueGenerator.GetDefaultValue(parameters.Schema, 
++                HasDefaultValue = defaultValueGenerator.GetDefaultValue(parameters.Schema,
+                     parameters.IsPropertyNullable, type, parameters.TypeNameHint, parameters.Settings.GenerateDefaultValues) != null,
+-                DefaultValue = defaultValueGenerator.GetDefaultValue(parameters.Schema, 
++                DefaultValue = defaultValueGenerator.GetDefaultValue(parameters.Schema,
+                     parameters.IsPropertyNullable, type, parameters.TypeNameHint, parameters.Settings.GenerateDefaultValues),
+ 
+                 Type = type,
+@@ -49,7 +54,9 @@ private static object CreateModel(DataConversionParameters parameters)
+                 IsDate = IsDate(parameters.Schema.Format, parameters.Settings.DateTimeType),
+ 
+                 IsDictionary = parameters.Schema.IsDictionary,
+-                DictionaryValueType = parameters.Resolver.TryResolve(parameters.Schema.AdditionalPropertiesSchema, parameters.TypeNameHint) ?? "any",
++                DictionaryValueType = dictionaryValueType,
++                DictionaryValueHasDefaultValue = dictionaryValueDefaultValue != null,
++                DictionaryValueDefaultValue = dictionaryValueDefaultValue,
+                 IsDictionaryValueNewableObject = parameters.Schema.AdditionalPropertiesSchema != null && IsNewableObject(parameters.Schema.AdditionalPropertiesSchema),
+                 IsDictionaryValueDate = IsDate(parameters.Schema.AdditionalPropertiesSchema?.ActualSchema?.Format, parameters.Settings.DateTimeType),
+                 IsDictionaryValueNewableArray = parameters.Schema.AdditionalPropertiesSchema?.ActualSchema?.Type.HasFlag(JsonObjectType.Array) == true &&
+diff --git a/src/NJsonSchema.CodeGeneration.TypeScript/Templates/ConvertToClassTemplate.tt b/src/NJsonSchema.CodeGeneration.TypeScript/Templates/ConvertToClassTemplate.tt
+index 53fbe1c..bd001c7 100644
+--- a/src/NJsonSchema.CodeGeneration.TypeScript/Templates/ConvertToClassTemplate.tt
++++ b/src/NJsonSchema.CodeGeneration.TypeScript/Templates/ConvertToClassTemplate.tt
+@@ -22,7 +22,7 @@ if (<#=Model.Value#>) {
+     for (let key in <#=Model.Value#>) {
+         if (<#=Model.Value#>.hasOwnProperty(key))
+ <#if(Model.IsDictionaryValueNewableObject){#>
+-            <#=Model.Variable#>[key] = <#=Model.Value#>[key] ? <#=Model.DictionaryValueType#>.fromJS(<#=Model.Value#>[key]<#if(Model.HandleReferences){#>, _mappings<#}#>) : <#if(Model.HasDefaultValue){#><#=Model.DefaultValue#><#}else{#><any><#=Model.NullValue#><#}#>;
++            <#=Model.Variable#>[key] = <#=Model.Value#>[key] ? <#=Model.DictionaryValueType#>.fromJS(<#=Model.Value#>[key]<#if(Model.HandleReferences){#>, _mappings<#}#>) : <#if(Model.DictionaryValueHasDefaultValue){#><#=Model.DictionaryValueDefaultValue#><#}else{#><any><#=Model.NullValue#><#}#>;
+ <#}else if(Model.IsDictionaryValueNewableArray){#>
+             <#=Model.Variable#>[key] = <#=Model.Value#>[key] ? <#=Model.Value#>[key].map((i: any) => <#=Model.DictionaryValueArrayItemType#>.fromJS(i<#if(Model.HandleReferences){#>, _mappings<#}#>)) : <#if(Model.HasDefaultValue){#><#=Model.DefaultValue#><#}else{#><any><#=Model.NullValue#><#}#>;
+ <#}else{#>

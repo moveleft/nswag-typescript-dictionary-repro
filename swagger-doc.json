@@ -1,0 +1,27 @@
+{
+    "swagger": "2.0",
+    "paths": {
+        "resource": {
+            "get": {
+                "responses": {
+                    "200": {
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "$ref": "#/definitions/myItem"
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "myItem": {
+            "type": "object",
+            "properties": {
+                "x": { "type": "number" }
+            }
+        }
+    }
+}
